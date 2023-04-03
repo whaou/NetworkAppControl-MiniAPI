@@ -1,15 +1,13 @@
-from typing import Any
-from fastapi import Request, FastAPI, Response, status
-from fastapi.responses import JSONResponse, FileResponse
-
+from fastapi import FastAPI, Response, status, Depends
+from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-
-from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
-
 from .db import crud, models
 from .db.database import SessionLocal, engine
 from src import schemas
+from requests.structures import CaseInsensitiveDict
+import requests
+import json
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -22,6 +20,30 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def get_token(url, user_pass):
+    
+
+    headers = CaseInsensitiveDict()
+    headers["accept"] = "application/json"
+    headers["Content-Type"] = "application/x-www-form-urlencoded"
+
+    data = {
+        "grant_type": "",
+        "username": user_pass["username"],
+        "password": user_pass["password"],
+        "scope": "",
+        "client_id": "",
+        "client_secret": ""
+    }
+
+    resp = requests.post(url, headers=headers, data=data)
+
+    resp_content = resp.json()
+
+    token = resp_content["access_token"]
+
+    return token
 
 @app.get("/")
 async def root():
@@ -46,8 +68,40 @@ async def config_stream(config: schemas.StreamConfig,
 
 @app.post("/start")
 async def start_test(configId: int, duration: int):
-    # Define start_test() function logic here
-    pass
+    
+    f = open("variables.json")
+    monitoring_payload = json.load(f)
+
+    nef_base_url = f"http://{monitoring_payload['nef_ip']}:{monitoring_payload['nef_port']}"
+
+    user_pass = {
+        "username": monitoring_payload['nef_username'],
+        "password": monitoring_payload['nef_pass']
+    }
+
+    key = get_token(nef_base_url+"/api/v1/login/access-token", user_pass)
+
+    headers = CaseInsensitiveDict()
+    headers["accept"] = "application/json"
+    headers["Authorization"] = "Bearer " + key
+    headers["Content-Type"] = "application/json"
+
+    monitoring_payload = {
+        "externalId": "123456789@domain.com",
+        "notificationDestination": "http://localhost:80/api/v1/utils/monitoring/callback",
+        "monitoringType": "LOCATION_REPORTING",
+        "maximumNumberOfReports": 1,
+        "monitorExpireTime": "2023-03-09T13:18:19.495000+00:00",
+        "maximumDetectionTime": 1,
+        "reachabilityType": "DATA"
+    }
+
+    requests.post(nef_base_url + "/nef/api/v1/3gpp-monitoring-event/v1/netapp/subscriptions",
+                headers=headers, data=json.dumps(monitoring_payload))
+    
+    return JSONResponse(content="Done", status_code=200)
+     
+
 
 @app.get("/status")
 async def get_status(runId: int):
