@@ -1,13 +1,21 @@
+# -*- coding: utf-8 -*-
+# @Author: Rafael Direito
+# @Date:   2023-05-22 10:53:45
+# @Last Modified by:   Rafael Direito
+# @Last Modified time: 2023-05-22 13:16:45
 from fastapi import FastAPI, Response, status, Depends
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
-from .db import crud, models
-from .db.database import SessionLocal, engine
-from src import schemas
+from db import crud, models
+from db.database import SessionLocal, engine
+import schemas.types as schemas
 from requests.structures import CaseInsensitiveDict
 import requests
 import json
+from aux import variables
+from nef_operations.operations_ids import NEF_OPERATION
+from nef_operations import operations as nef_operations
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -21,38 +29,17 @@ def get_db():
     finally:
         db.close()
 
-def get_token(url, user_pass):
-    
-
-    headers = CaseInsensitiveDict()
-    headers["accept"] = "application/json"
-    headers["Content-Type"] = "application/x-www-form-urlencoded"
-
-    data = {
-        "grant_type": "",
-        "username": user_pass["username"],
-        "password": user_pass["password"],
-        "scope": "",
-        "client_id": "",
-        "client_secret": ""
-    }
-
-    resp = requests.post(url, headers=headers, data=data)
-
-    resp_content = resp.json()
-
-    token = resp_content["access_token"]
-
-    return token
 
 @app.get("/")
 async def root():
     return {"Server says It's All Good"}
 
+
 @app.get("/info")
 async def get_info():
     # Define get_info() function logic here
     pass
+
 
 @app.post("/configStream", status_code=status.HTTP_201_CREATED)
 async def config_stream(config: schemas.StreamConfig, 
@@ -66,42 +53,66 @@ async def config_stream(config: schemas.StreamConfig,
     response.headers["Location"] = f"/configStream/{stream.id}"
     return stream.id
 
-@app.post("/start")
-async def start_test(configId: int, duration: int):
+
+@app.post("/configure", status_code=status.HTTP_200_OK)
+async def configure(payload: schemas.Configuration):
+    # Set variables
+    print(payload.variables)
+    variables.VARIABLES = payload.variables
     
-    f = open("variables.json")
-    monitoring_payload = json.load(f)
+    return JSONResponse(content="Variables Saved!", status_code=200)
 
-    nef_base_url = f"http://{monitoring_payload['nef_ip']}:{monitoring_payload['nef_port']}"
 
-    user_pass = {
-        "username": monitoring_payload['nef_username'],
-        "password": monitoring_payload['nef_pass']
-    }
 
-    key = get_token(nef_base_url+"/api/v1/login/access-token", user_pass)
 
-    headers = CaseInsensitiveDict()
-    headers["accept"] = "application/json"
-    headers["Authorization"] = "Bearer " + key
-    headers["Content-Type"] = "application/json"
-
-    monitoring_payload = {
-        "externalId": "123456789@domain.com",
-        "notificationDestination": "http://localhost:80/api/v1/utils/monitoring/callback",
-        "monitoringType": "LOCATION_REPORTING",
-        "maximumNumberOfReports": 1,
-        "monitorExpireTime": "2023-03-09T13:18:19.495000+00:00",
-        "maximumDetectionTime": 1,
-        "reachabilityType": "DATA"
-    }
-
-    requests.post(nef_base_url + "/nef/api/v1/3gpp-monitoring-event/v1/netapp/subscriptions",
-                headers=headers, data=json.dumps(monitoring_payload))
+@app.post("/start/{operation_id}")
+async def start_test(operation_id: int):
+    try:
+        if operation_id == NEF_OPERATION.LOGIN.value:
+            token = nef_operations.login(
+                ip=variables.VARIABLES["NEF_IP"],
+                port=variables.VARIABLES["NEF_PORT"],
+                username=variables.VARIABLES["NEF_LOGIN_USERNAME"],
+                password=variables.VARIABLES["NEF_LOGIN_PASSWORD"],
+            )
+            variables.VARIABLES["AUTH_TOKEN"] = token
+            return JSONResponse(content="Login Done", status_code=200)
+        
+        if operation_id == NEF_OPERATION.CREATE_UE.value:
+            nef_operations.create_ue(
+                ip=variables.VARIABLES["NEF_IP"],
+                port=variables.VARIABLES["NEF_PORT"],
+                ue_name=variables.VARIABLES["UE1_NAME"],
+                ue_description=variables.VARIABLES["UE1_DESCRIPTION"],
+                ue_ipv4=variables.VARIABLES["UE1_IPV4"],
+                ue_ipv6=variables.VARIABLES["UE1_IPV6"],
+                ue_mac=variables.VARIABLES["UE1_MAC_ADDRESS"],
+                ue_supi=variables.VARIABLES["UE1_SUPI"],
+                token = variables.VARIABLES["AUTH_TOKEN"]
+            )
+            return JSONResponse(content="Created UE", status_code=200)
+        
+        if operation_id == NEF_OPERATION.GET_UES.value:
+            nef_operations.get_ues(
+                ip=variables.VARIABLES["NEF_IP"],
+                port=variables.VARIABLES["NEF_PORT"],
+                token = variables.VARIABLES["AUTH_TOKEN"]
+            )
+            return JSONResponse(content="Got UEs", status_code=200)
+        
+        if operation_id == NEF_OPERATION.SUBSCRIPTION.value:
+            nef_operations.subscribe_event(
+                ip=variables.VARIABLES["NEF_IP"],
+                port=variables.VARIABLES["NEF_PORT"],
+                callback_url=variables.VARIABLES["SUBS1_CALLBACK_URL"],
+                monitoring_type=variables.VARIABLES["SUBS1_MONITORING_TYPE"],
+                monitoring_expire_time=variables.VARIABLES["SUBS1_MONITORING_EXPIRE_TIME"],
+                token = variables.VARIABLES["AUTH_TOKEN"]
+            )
+            return JSONResponse(content="Subscription Done", status_code=200)
     
-    return JSONResponse(content="Done", status_code=200)
-     
-
+    except Exception as e:
+        return JSONResponse(content=f"Error: {e}", status_code=400)
 
 @app.get("/status")
 async def get_status(runId: int):

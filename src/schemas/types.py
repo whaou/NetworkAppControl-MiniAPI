@@ -1,10 +1,18 @@
-from typing import Optional, List
+# -*- coding: utf-8 -*-
+# @Author: Rafael Direito
+# @Date:   2023-05-22 10:53:45
+# @Last Modified by:   Rafael Direito
+# @Last Modified time: 2023-05-22 11:06:16
+from typing import Optional, List, Dict
 from pydantic import BaseModel, Field, Extra
 
 class ConfigBaseModel(BaseModel):
     
     class Config:
         extra = Extra.forbid
+
+class Configuration(ConfigBaseModel):
+    variables: Dict[str, str]
 
 class NetworkAppInfo(ConfigBaseModel):
     name: str = Field("Autonomous Driving NetworkApp")
