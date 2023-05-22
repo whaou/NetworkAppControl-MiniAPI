@@ -2,7 +2,7 @@
 # @Author: Rafael Direito
 # @Date:   2023-05-22 11:40:10
 # @Last Modified by:   Rafael Direito
-# @Last Modified time: 2023-05-22 13:23:11
+# @Last Modified time: 2023-05-22 16:39:58
 import requests
 import json 
 
@@ -29,7 +29,9 @@ def login (ip, port, username, password):
     )
     
     # Check if the login was successful
-    response.raise_for_status()
+    if response.status_code not in [200, 201, 409]:
+        response.raise_for_status()
+
 
     print("Login Response:", response.text)
     resp_content = response.json()
@@ -54,7 +56,8 @@ def get_ues(ip, port, token):
     )
     
     print("Get UEs Response:", response.text)
-    response.raise_for_status()
+    if response.status_code not in [200, 201, 409]:
+        response.raise_for_status()
 
 
 def subscribe_event (ip, port, callback_url, monitoring_type,
@@ -85,7 +88,9 @@ def subscribe_event (ip, port, callback_url, monitoring_type,
     )
     
     print("Monitoring Subscription Response:", response.text)
-    response.raise_for_status()
+    if response.status_code not in [200, 201, 409]:
+        response.raise_for_status()
+
     
 
 
@@ -115,4 +120,5 @@ def create_ue(ip, port, ue_name, ue_description,
     )
     
     print("Create UE Response:", response.text)
-    response.raise_for_status()
+    if response.status_code not in [200, 201, 409]:
+        response.raise_for_status()
