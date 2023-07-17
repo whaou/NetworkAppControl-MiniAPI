@@ -3,8 +3,8 @@
 # @Date:   2023-05-22 10:53:45
 # @Last Modified by:   Rafael Direito
 # @Last Modified time: 2023-05-22 13:16:45
-from fastapi import FastAPI, Response, status, Depends
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Path, Response, status, Depends
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from db import crud, models
@@ -13,13 +13,18 @@ import schemas.types as schemas
 from requests.structures import CaseInsensitiveDict
 import requests
 import json
+import os
 from aux import variables
-from nef_operations.operations_ids import NEF_OPERATION
+from aux.operations_ids import OPERATION
 from nef_operations import operations as nef_operations
+from performance_operations import operations as perf_operations
+from fastapi.staticfiles import StaticFiles
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 # Dependency
 def get_db():
@@ -66,9 +71,11 @@ async def configure(payload: schemas.Configuration):
 
 
 @app.post("/start/{operation_id}")
-async def start_test(operation_id: int):
+async def start_test(
+    operation_id: int, is_server: bool = False, server_ip: str | None = None ):
     try:
-        if operation_id == NEF_OPERATION.LOGIN.value:
+        print("...")
+        if operation_id == OPERATION.LOGIN.value:
             token = nef_operations.login(
                 ip=variables.VARIABLES["NEF_IP"],
                 port=variables.VARIABLES["NEF_PORT"],
@@ -78,7 +85,7 @@ async def start_test(operation_id: int):
             variables.VARIABLES["AUTH_TOKEN"] = token
             return JSONResponse(content="Login Done", status_code=200)
         
-        if operation_id == NEF_OPERATION.CREATE_UE.value:
+        if operation_id == OPERATION.CREATE_UE.value:
             nef_operations.create_ue(
                 ip=variables.VARIABLES["NEF_IP"],
                 port=variables.VARIABLES["NEF_PORT"],
@@ -92,7 +99,7 @@ async def start_test(operation_id: int):
             )
             return JSONResponse(content="Created UE", status_code=200)
         
-        if operation_id == NEF_OPERATION.GET_UES.value:
+        if operation_id == OPERATION.GET_UES.value:
             nef_operations.get_ues(
                 ip=variables.VARIABLES["NEF_IP"],
                 port=variables.VARIABLES["NEF_PORT"],
@@ -100,7 +107,7 @@ async def start_test(operation_id: int):
             )
             return JSONResponse(content="Got UEs", status_code=200)
         
-        if operation_id == NEF_OPERATION.SUBSCRIPTION.value:
+        if operation_id == OPERATION.SUBSCRIPTION.value:
             nef_operations.subscribe_event(
                 ip=variables.VARIABLES["NEF_IP"],
                 port=variables.VARIABLES["NEF_PORT"],
@@ -110,7 +117,28 @@ async def start_test(operation_id: int):
                 token = variables.VARIABLES["AUTH_TOKEN"]
             )
             return JSONResponse(content="Subscription Done", status_code=200)
-    
+        if operation_id == OPERATION.UE_PATH_LOSS.value:
+            nef_operations.get_ue_path_loss(
+                ip=variables.VARIABLES["NEF_IP"],
+                port=variables.VARIABLES["NEF_PORT"],
+                  ue_supi=variables.VARIABLES["UE1_SUPI"],
+                token = variables.VARIABLES["AUTH_TOKEN"]
+            )
+            return JSONResponse(content="Got UE Path Loss Information", status_code=200)
+        if operation_id == OPERATION.SERVING_CELL_INFO.value:
+            nef_operations.get_serving_cell_info(
+                ip=variables.VARIABLES["NEF_IP"],
+                port=variables.VARIABLES["NEF_PORT"],
+                ue_supi=variables.VARIABLES["UE1_SUPI"],
+                token = variables.VARIABLES["AUTH_TOKEN"]
+            )
+            return JSONResponse(content="Got UE Serving Cell Information", status_code=200)
+
+        if operation_id == OPERATION.E2E_UE_PERFORMANCE.value:
+            perf_operations.run_iperf_test(is_server, server_ip)
+            _type = "Server" if is_server else "Client"
+            return JSONResponse(content=f"Started E2E UE Performance Test, as  {_type} Side", status_code=200)
+
     except Exception as e:
         return JSONResponse(content=f"Error: {e}", status_code=400)
 
@@ -124,7 +152,21 @@ async def abort_test(runId: int):
     # Define abort_test() function logic here
     pass
 
-@app.get("/report")
-async def get_report(runId: int):
-    # Define get_report() function logic here
-    pass
+@app.get("/results/{operation_id}")
+async def get_report(operation_id: int):
+    
+    if operation_id == OPERATION.E2E_UE_PERFORMANCE.value:
+        return FileResponse(path=f'./static/{variables.E2E_RESULTS}')
+
+
+
+@app.post("/stop/{operation_id}")
+async def stop_test(operation_id: int):
+    try:
+        if operation_id ==OPERATION.E2E_UE_PERFORMANCE.value:
+            os.remove(f'./static/{variables.E2E_RESULTS}')
+            return JSONResponse(content="Sucessfully Cleaned Up test environment", status_code=200)
+     
+    except Exception as e:
+        return JSONResponse(content=f"Error: {e}", status_code=400)
+
