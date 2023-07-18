@@ -1,6 +1,8 @@
 
 import subprocess
 import aux.variables as variables
+from aux.ping_wrapper import PingWrapperThread
+import pingparsing
 
 def start_iperf_server():
     # Command to start the iperf3 server
@@ -26,3 +28,15 @@ def run_iperf_test(is_server: bool = False, server_ip = None):
         print("Starting Client....")
         start_iperf_client(server_ip)
     return "OK"
+
+
+def start_ping(target_ip):
+    ping_parser = pingparsing.PingParsing()
+    transmiter = pingparsing.PingTransmitter()
+    wrapper = PingWrapperThread(
+        target=target_ip,
+        parser=ping_parser,
+        transmitter=transmiter
+    )
+    wrapper.start()
+    wrapper.join()

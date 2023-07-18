@@ -138,6 +138,11 @@ async def start_test(
             perf_operations.run_iperf_test(is_server, server_ip)
             _type = "Server" if is_server else "Client"
             return JSONResponse(content=f"Started E2E UE Performance Test, as  {_type} Side", status_code=200)
+        
+        if operation_id == OPERATION.E2E_UE_RTT_PERFORMANCE.value:
+            perf_operations.start_ping(server_ip)
+            return JSONResponse(content=f"Started E2E UE RTT Performance Test", status_code=200)
+
 
     except Exception as e:
         return JSONResponse(content=f"Error: {e}", status_code=400)
@@ -158,6 +163,8 @@ async def get_report(operation_id: int):
     if operation_id == OPERATION.E2E_UE_PERFORMANCE.value:
         return FileResponse(path=f'./static/{variables.E2E_RESULTS}')
 
+    if operation_id == OPERATION.E2E_UE_RTT_PERFORMANCE.value:
+        return FileResponse(path=f'./static/{variables.E2E_RTT_RESULTS}')
 
 
 @app.post("/stop/{operation_id}")
@@ -165,6 +172,10 @@ async def stop_test(operation_id: int):
     try:
         if operation_id ==OPERATION.E2E_UE_PERFORMANCE.value:
             os.remove(f'./static/{variables.E2E_RESULTS}')
+            return JSONResponse(content="Sucessfully Cleaned Up test environment", status_code=200)
+        
+        if operation_id ==OPERATION.E2E_UE_PERFORMANCE.value:
+            os.remove(f'./static/{variables.E2E_RTT_RESULTS}')
             return JSONResponse(content="Sucessfully Cleaned Up test environment", status_code=200)
      
     except Exception as e:
