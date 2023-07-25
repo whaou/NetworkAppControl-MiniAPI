@@ -1,8 +1,13 @@
+# -*- coding: utf-8 -*-
+# @Author: Rafael Direito
+# @Date:   2023-05-22 10:53:45
+# @Last Modified by:   Rafael Direito
+# @Last Modified time: 2023-05-22 11:02:31
 from sqlalchemy.orm import Session
 from fastapi.encoders import jsonable_encoder
 
-from . import models
-from .. import schemas
+from db import models
+from schemas import types as schemas
 
 
 def get_stream_config(db: Session, stream_config_id: int):
