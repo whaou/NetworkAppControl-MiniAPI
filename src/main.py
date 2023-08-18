@@ -72,7 +72,7 @@ async def configure(payload: schemas.Configuration):
 
 @app.post("/start/{operation_id}")
 async def start_test(
-    operation_id: int, is_server: bool = False, server_ip: str | None = None ):
+    operation_id: int, is_server: bool = False, server_ip: str = None ):
     try:
         print("...")
         if operation_id == OPERATION.LOGIN.value:
