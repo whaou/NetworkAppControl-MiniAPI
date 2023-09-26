@@ -72,9 +72,11 @@ async def configure(payload: schemas.Configuration):
 
 @app.post("/start/{operation_id}")
 async def start_test(
-    operation_id: int, is_server: bool = False, server_ip: str = None ):
+    operation_id: int,
+    is_server: bool = False,
+    server_ip: str = None,
+    is_cnf: bool = False):
     try:
-        print("...")
         if operation_id == OPERATION.LOGIN.value:
             token = nef_operations.login(
                 ip=variables.VARIABLES["NEF_IP"],
@@ -140,7 +142,10 @@ async def start_test(
             return JSONResponse(content=f"Started E2E UE Performance Test, as  {_type} Side", status_code=200)
         
         if operation_id == OPERATION.E2E_UE_RTT_PERFORMANCE.value:
-            perf_operations.start_ping(server_ip)
+            if not is_cnf:
+                perf_operations.start_ping(server_ip)
+            else:
+                perf_operations.start_hping(server_ip)
             return JSONResponse(content=f"Started E2E UE RTT Performance Test", status_code=200)
 
 

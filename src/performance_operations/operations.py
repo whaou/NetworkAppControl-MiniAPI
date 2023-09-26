@@ -3,6 +3,8 @@ import subprocess
 import aux.variables as variables
 from aux.ping_wrapper import PingWrapperThread
 import pingparsing
+from aux.ping_wrapper import parse_hping_output
+import json
 
 def start_iperf_server():
     # Command to start the iperf3 server
@@ -40,3 +42,25 @@ def start_ping(target_ip):
     )
     wrapper.start()
     wrapper.join()
+
+def start_hping(target_ip):
+    host, port = target_ip.split(":")
+    if host == None or port == None:
+        raise("Error!")
+    try:
+        # Run hping3 command
+        command = f"hping3 -S -c 5 {host} -p {port}"
+        output = subprocess.check_output(command,
+                    shell=True,
+                    stderr=subprocess.STDOUT,
+                    universal_newlines=True)
+
+        # Parse the output
+        parsed_output = parse_hping_output(output)
+        with open(f'./static/{variables.E2E_RTT_RESULTS}', 'w') as json_file:
+            json.dump(parsed_output, json_file)
+        return parsed_output
+    except subprocess.CalledProcessError as e:
+        print(f"Error running hping3: {e}")
+        return None
+
