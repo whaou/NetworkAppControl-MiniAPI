@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # @Author: Rafael Direito
 # @Date:   2023-05-22 11:40:10
-# @Last Modified by:   Rafael Direito
-# @Last Modified time: 2023-05-22 16:39:58
+# @Last Modified by:   Eduardo Santos
+# @Last Modified time: 2023-12-26 21:15:47
 import requests
 import json 
 
@@ -211,3 +211,21 @@ def get_serving_cell_info(ip, port, ue_supi, token):
     stop_ue_movement_loop(
         ip, port, ue_supi, token
     )
+
+def get_ue_handover_event(ip, port, ue_supi, token):
+    print("starting....")
+    url = f"http://{ip}:{port}/api/v1/UEs/{ue_supi}/handovers"
+        
+    headers = {}
+    headers["accept"] = "application/json"
+    headers["Authorization"] = "Bearer " + token
+    headers["Content-Type"] = "application/json"
+
+    response = requests.get(
+        url=url,
+        headers=headers, 
+    )
+    
+    print("Get UEs Handovers Information:", response.text)
+    if response.status_code not in [200, 201, 409]:
+        response.raise_for_status()

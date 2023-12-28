@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # @Author: Rafael Direito
 # @Date:   2023-05-22 10:53:45
-# @Last Modified by:   Rafael Direito
-# @Last Modified time: 2023-05-22 13:16:45
+# @Last Modified by:   Eduardo Santos
+# @Last Modified time: 2023-12-26 17:25:09
 from fastapi import FastAPI, Path, Response, status, Depends
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
@@ -135,6 +135,15 @@ async def start_test(
                 token = variables.VARIABLES["AUTH_TOKEN"]
             )
             return JSONResponse(content="Got UE Serving Cell Information", status_code=200)
+        
+        if operation_id == OPERATION.HANDOVER.value:
+            nef_operations.get_ue_handover_event(
+                ip=variables.VARIABLES["NEF_IP"],
+                port=variables.VARIABLES["NEF_PORT"],
+                ue_supi=variables.VARIABLES["UE1_SUPI"],
+                token = variables.VARIABLES["AUTH_TOKEN"]
+            )
+            return JSONResponse(content="Subscription Done", status_code=200)
 
         if operation_id == OPERATION.E2E_UE_PERFORMANCE.value:
             perf_operations.run_iperf_test(is_server, server_ip)
