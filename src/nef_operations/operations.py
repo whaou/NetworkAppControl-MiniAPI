@@ -214,8 +214,8 @@ def get_serving_cell_info(ip, port, ue_supi, token):
 
 def get_ue_handover_event(ip, port, ue_supi, token):
     print("starting....")
-    url = f"http://{ip}:{port}/api/v1/UEs/{ue_supi}/handovers"
-        
+    url = f"http://{ip}:{port}/test/api/v1/UEs/{ue_supi}/handovers"
+    print(f"URL: {url}")
     headers = {}
     headers["accept"] = "application/json"
     headers["Authorization"] = "Bearer " + token
