@@ -5,6 +5,7 @@ from aux.ping_wrapper import PingWrapperThread
 import pingparsing
 from aux.ping_wrapper import parse_hping_output
 import json
+import os
 
 def start_iperf_server():
     # Command to start the iperf3 server
@@ -64,3 +65,28 @@ def start_hping(target_ip):
         print(f"Error running hping3: {e}")
         return None
 
+def create_process_group():
+    os.setpgrp()
+    
+def start_netstat_command():
+    # Command to start the netsat connections monitoring loop
+    # The monitoring will run for 300 seconds and then stop.
+    # This process can also be killed by invoking the /stop endpoint
+    command = "start_time=$(date +%s); while true; do current_time=$(date " \
+        "+%s); elapsed_time=$((current_time - start_time)); if " \
+        "[ $elapsed_time -ge 300 ]; then break; fi; netstat -an " \
+        f"| grep \"ESTABLISHED\" | wc -l >> " \
+        f"./static/{variables.MAX_CONNECTIONS_RESULTS}; sleep 1; done"
+
+    # Run the command as a background process
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True,
+        preexec_fn=create_process_group
+    )
+    print("Started Netstat Monitoring Loop process...")
+    # Optional: Print the process ID (PID) if needed
+    print("Process ID:", process.pid)
+    return process

@@ -14,6 +14,7 @@ from requests.structures import CaseInsensitiveDict
 import requests
 import json
 import os
+import signal
 from aux import variables
 from aux.operations_ids import OPERATION
 from nef_operations import operations as nef_operations
@@ -25,6 +26,9 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+RUNNING_PROCESSES = {
+    OPERATION.MAX_CONNECTIONS.value: []
+}
 
 # Dependency
 def get_db():
@@ -72,7 +76,7 @@ async def configure(payload: schemas.Configuration):
 
 @app.post("/start/{operation_id}")
 async def start_test(
-    operation_id: int,
+    operation_id: str,
     is_server: bool = False,
     server_ip: str = None,
     is_cnf: bool = False):
@@ -157,6 +161,18 @@ async def start_test(
                 perf_operations.start_hping(server_ip)
             return JSONResponse(content=f"Started E2E UE RTT Performance Test", status_code=200)
 
+        if operation_id == OPERATION.MAX_CONNECTIONS.value:
+            # Delete old results file
+            if os.path.exists(f'./static/{variables.E2E_RESULTS}'):
+                os.remove(f'./static/{variables.E2E_RESULTS}')
+            # Start the netstat loop
+            netstat_process = perf_operations.start_netstat_command()
+            
+            # Save to process to kill it later, when /stop is invoked
+            RUNNING_PROCESSES[OPERATION.MAX_CONNECTIONS.value].append(
+                netstat_process
+            )
+            
 
     except Exception as e:
         return JSONResponse(content=f"Error: {e}", status_code=400)
@@ -172,26 +188,42 @@ async def abort_test(runId: int):
     pass
 
 @app.get("/results/{operation_id}")
-async def get_report(operation_id: int):
+async def get_report(operation_id: str):
     
     if operation_id == OPERATION.E2E_UE_PERFORMANCE.value:
         return FileResponse(path=f'./static/{variables.E2E_RESULTS}')
 
     if operation_id == OPERATION.E2E_UE_RTT_PERFORMANCE.value:
         return FileResponse(path=f'./static/{variables.E2E_RTT_RESULTS}')
+    
+    if operation_id == OPERATION.MAX_CONNECTIONS.value:
+        return FileResponse(
+            path=f'./static/{variables.MAX_CONNECTIONS_RESULTS}'
+        )
 
 
 @app.post("/stop/{operation_id}")
-async def stop_test(operation_id: int):
+async def stop_test(operation_id: str):
     try:
-        if operation_id ==OPERATION.E2E_UE_PERFORMANCE.value:
+        if operation_id == OPERATION.E2E_UE_PERFORMANCE.value:
             os.remove(f'./static/{variables.E2E_RESULTS}')
             return JSONResponse(content="Sucessfully Cleaned Up test environment", status_code=200)
         
         if operation_id ==OPERATION.E2E_UE_PERFORMANCE.value:
             os.remove(f'./static/{variables.E2E_RTT_RESULTS}')
             return JSONResponse(content="Sucessfully Cleaned Up test environment", status_code=200)
-     
+
+        if operation_id == OPERATION.MAX_CONNECTIONS.value:
+            
+            while RUNNING_PROCESSES[OPERATION.MAX_CONNECTIONS.value]:
+                rp = RUNNING_PROCESSES[OPERATION.MAX_CONNECTIONS.value].pop()
+                print(f"Will kill Netstat Process with PID {rp.pid}")
+                # Force kill the process (send SIGKILL)
+                os.killpg(os.getpgid(rp.pid), signal.SIGTERM)
+                # Wait for the process to complete after termination/kill
+                rp.wait()
+                print(f"Netstat Process with PID {rp.pid} was terminated")
+           
     except Exception as e:
         return JSONResponse(content=f"Error: {e}", status_code=400)
 
