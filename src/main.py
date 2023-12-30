@@ -14,6 +14,7 @@ from requests.structures import CaseInsensitiveDict
 import requests
 import json
 import os
+import signal
 from aux import variables
 from aux.operations_ids import OPERATION
 from nef_operations import operations as nef_operations
@@ -25,8 +26,8 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-
 RUNNING_PROCESSES = {
+    OPERATION.MAX_CONNECTIONS.value: []
     OPERATION.MAX_HOPS.value: []
 }
 
@@ -162,6 +163,7 @@ async def start_test(
                 perf_operations.start_hping(server_ip)
             return JSONResponse(content=f"Started E2E UE RTT Performance Test", status_code=200)
 
+
         if operation_id == OPERATION.MAX_HOPS.value:
             print("Target:", target)
             # Delete old results file
@@ -181,6 +183,33 @@ async def start_test(
                 content=f"Started Max Hops Performance Test",
                 status_code=200
             )
+
+        if operation_id == OPERATION.MAX_CONNECTIONS.value:
+            # Delete old results file
+            if os.path.exists(f'./static/{variables.E2E_RESULTS}'):
+                os.remove(f'./static/{variables.E2E_RESULTS}')
+            # Start the netstat loop
+            netstat_process = perf_operations.start_netstat_command()
+            
+            # If we can start a monitoring process everything is ok
+            if netstat_process:
+                # Save to process to kill it later, when /stop is invoked
+                RUNNING_PROCESSES[OPERATION.MAX_CONNECTIONS.value].append(
+                    netstat_process
+                )
+                print("Connections monitoring process was started...")
+                return JSONResponse(
+                    content="Connections monitoring process was started...",
+                    status_code=200
+                )
+            # If we couldn't start a monitoring process, inform the client
+            else:
+                print("Could not start the connections monitoring process")
+                return JSONResponse(
+                    content="Could not start the connections monitoring " +
+                    "process",
+                    status_code=400
+                )
 
     except Exception as e:
         return JSONResponse(content=f"Error: {e}", status_code=400)
@@ -203,6 +232,11 @@ async def get_report(operation_id: str):
 
     if operation_id == OPERATION.E2E_UE_RTT_PERFORMANCE.value:
         return FileResponse(path=f'./static/{variables.E2E_RTT_RESULTS}')
+    
+    if operation_id == OPERATION.MAX_CONNECTIONS.value:
+        return FileResponse(
+            path=f'./static/{variables.MAX_CONNECTIONS_RESULTS}'
+        )
 
     if operation_id == OPERATION.MAX_HOPS.value:
         # The test may still be running when the user requests its results
@@ -223,7 +257,7 @@ async def get_report(operation_id: str):
 @app.post("/stop/{operation_id}")
 async def stop_test(operation_id: str):
     try:
-        if operation_id ==OPERATION.E2E_UE_PERFORMANCE.value:
+        if operation_id == OPERATION.E2E_UE_PERFORMANCE.value:
             os.remove(f'./static/{variables.E2E_RESULTS}')
             return JSONResponse(
                 content="Sucessfully Cleaned Up test environment",
@@ -232,6 +266,7 @@ async def stop_test(operation_id: str):
         
         if operation_id ==OPERATION.E2E_UE_PERFORMANCE.value:
             os.remove(f'./static/{variables.E2E_RTT_RESULTS}')
+
             return JSONResponse(
                 content="Sucessfully Cleaned Up test environment",
                 status_code=200
@@ -255,8 +290,20 @@ async def stop_test(operation_id: str):
                 content="Sucessfully Stopped the Max Hops Performance Test",
                 status_code=200
             )
+ 
+        if operation_id == OPERATION.MAX_CONNECTIONS.value:
+            
+            while RUNNING_PROCESSES[OPERATION.MAX_CONNECTIONS.value]:
+                rp = RUNNING_PROCESSES[OPERATION.MAX_CONNECTIONS.value].pop()
+                print(f"Will kill Netstat Process with PID {rp.pid}")
+                # Force kill the process (send SIGKILL)
+                os.killpg(os.getpgid(rp.pid), signal.SIGTERM)
+                # Wait for the process to complete after termination/kill
+                rp.wait()
+                print(f"Netstat Process with PID {rp.pid} was terminated")
 
-     
+            return JSONResponse(content="Sucessfully Cleaned Up test environment", status_code=200)
+
     except Exception as e:
         return JSONResponse(content=f"Error: {e}", status_code=400)
 

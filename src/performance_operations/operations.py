@@ -8,6 +8,7 @@ import json
 import os
 import multiprocessing
 
+
 def start_iperf_server():
     # Command to start the iperf3 server
     command = "iperf3 -s -1 &"
@@ -116,6 +117,42 @@ def start_max_hops_computing(target):
     )
     process.start()
     print("Started the hops computation process...")
+    # Optional: Print the process ID (PID) if needed
+    print("Process ID:", process.pid)
+    return process
+
+
+def create_process_group():
+    os.setpgrp()
+
+
+def start_netstat_command():
+    
+    if os.system(f"netstat --version > /dev/null") == 0:
+        base_command = "netstat -an | grep \"ESTABLISHED\""
+    elif os.system(f"ss --version > /dev/null") == 0:
+        base_command = "ss -t state established"
+    else:
+        return None
+            
+    # Command to start the netsat connections monitoring loop
+    # The monitoring will run for 300 seconds and then stop.
+    # This process can also be killed by invoking the /stop endpoint
+    command = "start_time=$(date +%s); while true; do current_time=$(date " \
+        "+%s); elapsed_time=$((current_time - start_time)); if " \
+        f"[ $elapsed_time -ge 300 ]; then break; fi; {base_command} " \
+        "| wc -l >> " \
+        f"./static/{variables.MAX_CONNECTIONS_RESULTS}; sleep 1; done"
+
+    # Run the command as a background process
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True,
+        preexec_fn=create_process_group
+    )
+    print("Started Netstat Monitoring Loop process...")
     # Optional: Print the process ID (PID) if needed
     print("Process ID:", process.pid)
     return process

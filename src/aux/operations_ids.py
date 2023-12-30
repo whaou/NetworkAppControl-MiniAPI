@@ -19,3 +19,4 @@ class OPERATION(Enum):
     E2E_UE_PERFORMANCE = '7'
     E2E_UE_RTT_PERFORMANCE = '8'
     MAX_HOPS = "Def14Perf13"
+    MAX_CONNECTIONS = "Def14Perf11"
