@@ -168,10 +168,27 @@ async def start_test(
             # Start the netstat loop
             netstat_process = perf_operations.start_netstat_command()
             
-            # Save to process to kill it later, when /stop is invoked
-            RUNNING_PROCESSES[OPERATION.MAX_CONNECTIONS.value].append(
-                netstat_process
-            )
+            # If we can start a monitoring process everything is ok
+            if netstat_process:
+                # Save to process to kill it later, when /stop is invoked
+                RUNNING_PROCESSES[OPERATION.MAX_CONNECTIONS.value].append(
+                    netstat_process
+                )
+                print("Connections monitoring process was started...")
+                return JSONResponse(
+                    content="Connections monitoring process was started...",
+                    status_code=200
+                )
+            # If we couldn't start a monitoring process, inform the client
+            else:
+                print("Could not start the connections monitoring process")
+                return JSONResponse(
+                    content="Could not start the connections monitoring " +
+                    "process",
+                    status_code=400
+                )
+
+            
             
 
     except Exception as e:

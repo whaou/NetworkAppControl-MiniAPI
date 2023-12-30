@@ -69,13 +69,21 @@ def create_process_group():
     os.setpgrp()
     
 def start_netstat_command():
+    
+    if os.system(f"netstat --version > /dev/null") == 0:
+        base_command = "netstat -an | grep \"ESTABLISHED\""
+    elif os.system(f"ss --version > /dev/null") == 0:
+        base_command = "ss -t state established"
+    else:
+        return None
+            
     # Command to start the netsat connections monitoring loop
     # The monitoring will run for 300 seconds and then stop.
     # This process can also be killed by invoking the /stop endpoint
     command = "start_time=$(date +%s); while true; do current_time=$(date " \
         "+%s); elapsed_time=$((current_time - start_time)); if " \
-        "[ $elapsed_time -ge 300 ]; then break; fi; netstat -an " \
-        f"| grep \"ESTABLISHED\" | wc -l >> " \
+        f"[ $elapsed_time -ge 300 ]; then break; fi; {base_command} " \
+        "| wc -l >> " \
         f"./static/{variables.MAX_CONNECTIONS_RESULTS}; sleep 1; done"
 
     # Run the command as a background process
