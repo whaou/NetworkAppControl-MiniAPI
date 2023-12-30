@@ -27,7 +27,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 RUNNING_PROCESSES = {
-    OPERATION.MAX_CONNECTIONS.value: []
+    OPERATION.MAX_CONNECTIONS.value: [],
     OPERATION.MAX_HOPS.value: []
 }
 
