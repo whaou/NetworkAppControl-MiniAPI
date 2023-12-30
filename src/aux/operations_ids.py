@@ -8,13 +8,14 @@ from enum import Enum
  
 class OPERATION(Enum):
     ### NEF
-    LOGIN = 1
-    CREATE_UE = 2
-    GET_UES = 3
-    SUBSCRIPTION = 4
-    UE_PATH_LOSS = 5
-    SERVING_CELL_INFO = 6
-    HANDOVER = 9
+    LOGIN = '1'
+    CREATE_UE = '2'
+    GET_UES = '3'
+    SUBSCRIPTION = '4'
+    UE_PATH_LOSS = '5'
+    SERVING_CELL_INFO = '6'
+    HANDOVER = '9'
     ### AVAILABILITY
-    E2E_UE_PERFORMANCE = 7
-    E2E_UE_RTT_PERFORMANCE = 8
+    E2E_UE_PERFORMANCE = '7'
+    E2E_UE_RTT_PERFORMANCE = '8'
+    MAX_HOPS = "Def14Perf13"

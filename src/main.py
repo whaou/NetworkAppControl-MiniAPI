@@ -26,6 +26,10 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+RUNNING_PROCESSES = {
+    OPERATION.MAX_HOPS.value: []
+}
+
 # Dependency
 def get_db():
     db = SessionLocal()
@@ -72,9 +76,10 @@ async def configure(payload: schemas.Configuration):
 
 @app.post("/start/{operation_id}")
 async def start_test(
-    operation_id: int,
+    operation_id: str,
     is_server: bool = False,
     server_ip: str = None,
+    target: str = None,
     is_cnf: bool = False):
     try:
         if operation_id == OPERATION.LOGIN.value:
@@ -157,6 +162,25 @@ async def start_test(
                 perf_operations.start_hping(server_ip)
             return JSONResponse(content=f"Started E2E UE RTT Performance Test", status_code=200)
 
+        if operation_id == OPERATION.MAX_HOPS.value:
+            print("Target:", target)
+            # Delete old results file
+            if os.path.exists(f'./static/{variables.MAX_HOPS_RESULTS}'):
+                os.remove(f'./static/{variables.MAX_HOPS_RESULTS}')
+                
+            # Start the number of hops until target process
+            max_hops_process = perf_operations.start_max_hops_computing(
+                target
+            )
+            # Save to process to kill it later, when /stop is invoked
+            RUNNING_PROCESSES[OPERATION.MAX_HOPS.value].append(
+                max_hops_process
+            )
+            
+            return JSONResponse(
+                content=f"Started Max Hops Performance Test",
+                status_code=200
+            )
 
     except Exception as e:
         return JSONResponse(content=f"Error: {e}", status_code=400)
@@ -172,7 +196,7 @@ async def abort_test(runId: int):
     pass
 
 @app.get("/results/{operation_id}")
-async def get_report(operation_id: int):
+async def get_report(operation_id: str):
     
     if operation_id == OPERATION.E2E_UE_PERFORMANCE.value:
         return FileResponse(path=f'./static/{variables.E2E_RESULTS}')
@@ -180,17 +204,58 @@ async def get_report(operation_id: int):
     if operation_id == OPERATION.E2E_UE_RTT_PERFORMANCE.value:
         return FileResponse(path=f'./static/{variables.E2E_RTT_RESULTS}')
 
+    if operation_id == OPERATION.MAX_HOPS.value:
+        # The test may still be running when the user requests its results
+        if not os.path.exists(f'./static/{variables.MAX_HOPS_RESULTS}'):
+            return JSONResponse(
+                content=f"The Max Hops Performance Test is not finished yet!",
+                status_code=404
+            )
+        
+        with open(f'./static/{variables.MAX_HOPS_RESULTS}', "r") as file:
+            data = json.load(file)
+            return JSONResponse(
+                content=data,
+                status_code=200
+            )
+        
 
 @app.post("/stop/{operation_id}")
-async def stop_test(operation_id: int):
+async def stop_test(operation_id: str):
     try:
         if operation_id ==OPERATION.E2E_UE_PERFORMANCE.value:
             os.remove(f'./static/{variables.E2E_RESULTS}')
-            return JSONResponse(content="Sucessfully Cleaned Up test environment", status_code=200)
+            return JSONResponse(
+                content="Sucessfully Cleaned Up test environment",
+                status_code=200
+            )
         
         if operation_id ==OPERATION.E2E_UE_PERFORMANCE.value:
             os.remove(f'./static/{variables.E2E_RTT_RESULTS}')
-            return JSONResponse(content="Sucessfully Cleaned Up test environment", status_code=200)
+            return JSONResponse(
+                content="Sucessfully Cleaned Up test environment",
+                status_code=200
+            )
+        
+        if operation_id == OPERATION.MAX_HOPS.value:
+            while RUNNING_PROCESSES[OPERATION.MAX_HOPS.value]:
+                rp = RUNNING_PROCESSES[OPERATION.MAX_HOPS.value].pop()
+                print(f"Will kill Hops Computing Process with PID {rp.pid}")
+                # Force the termination of the process
+                rp.terminate()
+                # If terminate() doesn't work, use kill()
+                if rp.is_alive():
+                    rp.kill()
+                # Wait for the process to complete after termination/kill
+                rp.join()
+                print(
+                    f"Hops Computing Process with PID {rp.pid} was terminated"
+                )
+            return JSONResponse(
+                content="Sucessfully Stopped the Max Hops Performance Test",
+                status_code=200
+            )
+
      
     except Exception as e:
         return JSONResponse(content=f"Error: {e}", status_code=400)
