@@ -2,7 +2,7 @@
 # @Author: Rafael Direito
 # @Date:   2023-05-22 11:40:10
 # @Last Modified by:   Eduardo Santos
-# @Last Modified time: 2023-12-31 18:01:02
+# @Last Modified time: 2023-12-31 18:11:01
 import requests
 import json 
 
@@ -230,37 +230,6 @@ def get_ue_handover_event(ip, port, ue_supi, token):
     if response.status_code not in [200, 201, 409]:
         response.raise_for_status()
 
-def subscribe_qos (ip, port, callback_url, monitoring_type,
-                     monitoring_expire_time, token):
-
-    url = f"http://{ip}:{port}/nef/api/v1/3gpp-monitoring-event/" \
-        "v1/netapp/subscriptions"
-        
-    headers = {}
-    headers["accept"] = "application/json"
-    headers["Authorization"] = "Bearer " + token
-    headers["Content-Type"] = "application/json"
-    
-    monitoring_payload = {
-        "externalId": "123456789@domain.com",
-        "notificationDestination": callback_url,
-        "monitoringType": monitoring_type,
-        "maximumNumberOfReports": 1,
-        "monitorExpireTime": monitoring_expire_time,
-        "maximumDetectionTime": 1,
-        "reachabilityType": "DATA"
-    }
-
-    response = requests.post(
-        url=url,
-        headers=headers, 
-        data=json.dumps(monitoring_payload)
-    )
-    
-    print("Monitoring Subscription Response:", response.text)
-    if response.status_code not in [200, 201, 409]:
-        response.raise_for_status()
-
 def subscribe_qos_event (ip, port, callback_url, monitoring_type,
                      monitoring_expire_time, token):
 
@@ -276,7 +245,7 @@ def subscribe_qos_event (ip, port, callback_url, monitoring_type,
         "ipv4Addr": "10.0.0.0",
         "ipv6Addr": "0:0:0:0:0:0:0:0",
         "macAddr": "22-00-00-00-00-00",
-        "notificationDestination": "http://localhost:80/api/v1/utils/session-with-qos/callback",
+        "notificationDestination": callback_url,
         "snssai": {
             "sst": 1,
             "sd": "000001"
