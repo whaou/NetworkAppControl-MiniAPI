@@ -2,7 +2,7 @@
 # @Author: Rafael Direito
 # @Date:   2023-05-22 10:53:45
 # @Last Modified by:   Eduardo Santos
-# @Last Modified time: 2023-12-31 17:26:07
+# @Last Modified time: 2023-12-31 18:42:45
 from fastapi import FastAPI, Path, Response, status, Depends
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
@@ -216,8 +216,6 @@ async def start_test(
                 ip=variables.VARIABLES["NEF_IP"],
                 port=variables.VARIABLES["NEF_PORT"],
                 callback_url=variables.VARIABLES["SUBS1_CALLBACK_URL"],
-                monitoring_type=variables.VARIABLES["SUBS1_MONITORING_TYPE"],
-                monitoring_expire_time=variables.VARIABLES["SUBS1_MONITORING_EXPIRE_TIME"],
                 token = variables.VARIABLES["AUTH_TOKEN"]
             )
             return JSONResponse(content="QoS Subscription Done", status_code=200)

@@ -2,7 +2,7 @@
 # @Author: Rafael Direito
 # @Date:   2023-05-22 11:40:10
 # @Last Modified by:   Eduardo Santos
-# @Last Modified time: 2023-12-31 18:11:01
+# @Last Modified time: 2023-12-31 18:42:56
 import requests
 import json 
 
@@ -230,8 +230,7 @@ def get_ue_handover_event(ip, port, ue_supi, token):
     if response.status_code not in [200, 201, 409]:
         response.raise_for_status()
 
-def subscribe_qos_event (ip, port, callback_url, monitoring_type,
-                     monitoring_expire_time, token):
+def subscribe_qos_event (ip, port, callback_url, token):
 
     url = f"http://{ip}:{port}/nef/api/v1/3gpp-as-session-with-qos/" \
         "v1/netapp/subscriptions"
