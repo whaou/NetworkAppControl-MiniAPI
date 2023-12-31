@@ -2,7 +2,7 @@
 # @Author: Rafael Direito
 # @Date:   2023-05-22 11:45:25
 # @Last Modified by:   Eduardo Santos
-# @Last Modified time: 2023-12-28 19:12:18
+# @Last Modified time: 2023-12-31 17:23:01
 
 from enum import Enum
  
@@ -15,6 +15,7 @@ class OPERATION(Enum):
     UE_PATH_LOSS = '5'
     SERVING_CELL_INFO = '6'
     HANDOVER = '9'
+    SUBSCRIBE_QOS_EVENT= "def11.5G.7"
     ### AVAILABILITY
     E2E_UE_PERFORMANCE = '7'
     E2E_UE_RTT_PERFORMANCE = '8'
