@@ -28,7 +28,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 RUNNING_PROCESSES = {
     OPERATION.MAX_CONNECTIONS.value: [],
-    OPERATION.MAX_HOPS.value: []
+    OPERATION.MAX_HOPS.value: [],
+    OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value: []
 }
 
 # Dependency
@@ -79,9 +80,9 @@ async def configure(payload: schemas.Configuration):
 async def start_test(
     operation_id: str,
     is_server: bool = False,
-    server_ip: str = None,
-    target: str = None,
-    is_cnf: bool = False):
+    target_ip: str = None,
+    target_port: int = None,
+    target: str = None):
     try:
         if operation_id == OPERATION.LOGIN.value:
             token = nef_operations.login(
@@ -151,21 +152,57 @@ async def start_test(
             )
             return JSONResponse(content="Subscription Done", status_code=200)
 
-        if operation_id == OPERATION.E2E_UE_PERFORMANCE.value:
-            perf_operations.run_iperf_test(is_server, server_ip)
-            _type = "Server" if is_server else "Client"
-            return JSONResponse(content=f"Started E2E UE Performance Test, as  {_type} Side", status_code=200)
-        
-        if operation_id == OPERATION.E2E_UE_RTT_PERFORMANCE.value:
-            if not is_cnf:
-                perf_operations.start_ping(server_ip)
+        if operation_id == OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value:
+            # Delete old results file
+            if os.path.exists(
+                f'./static/{variables.E2E_SINGLE_UE_THROUGHPUT_AND_LATENCY}'
+            ):
+                os.remove(
+                    f'./static/{variables.E2E_SINGLE_UE_THROUGHPUT_AND_LATENCY}'
+                )
+            
+            error_message = None
+            # If the current MiniAPI is a client
+            if not is_server:
+                # Now, we can run iperf3 in a indpendent process
+                iperf_server_process = perf_operations.start_iperf_client(
+                    target_ip=target_ip,
+                    number_of_streams=1
+                )
+                
+                if not iperf_server_process:
+                    error_message = "Couldn't start Iperf3 Client. Thus, the"\
+                    "E2E Single UE Throughput and Latency Test could not be "\
+                    "started!"
             else:
-                perf_operations.start_hping(server_ip)
-            return JSONResponse(content=f"Started E2E UE RTT Performance Test", status_code=200)
+                iperf_server_process = perf_operations.start_iperf_server()
+                
+                if not iperf_server_process:
+                    error_message = "Couldn't start Iperf3 Server. Thus, the"\
+                    "E2E Single UE Throughput and Latency Test could not be "\
+                    "started!" 
+                else:
+                    # Save to process to kill it later, when /stop is invoked
+                    RUNNING_PROCESSES[
+                        OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value
+                    ].append(iperf_server_process)
+            
+            if error_message:
+                return JSONResponse(
+                    content=error_message,
+                    status_code=400
+            )
+                
+            return JSONResponse(
+                content=f"Started E2E Single UE Throughput and Latency "
+                "Performance Test",
+                status_code=200
+            )
+            
+            
 
 
         if operation_id == OPERATION.MAX_HOPS.value:
-            print("Target:", target)
             # Delete old results file
             if os.path.exists(f'./static/{variables.MAX_HOPS_RESULTS}'):
                 os.remove(f'./static/{variables.MAX_HOPS_RESULTS}')
@@ -236,17 +273,38 @@ async def abort_test(runId: int):
 @app.get("/results/{operation_id}")
 async def get_report(operation_id: str):
     
-    if operation_id == OPERATION.E2E_UE_PERFORMANCE.value:
-        return FileResponse(path=f'./static/{variables.E2E_RESULTS}')
-
-    if operation_id == OPERATION.E2E_UE_RTT_PERFORMANCE.value:
-        return FileResponse(path=f'./static/{variables.E2E_RTT_RESULTS}')
-    
     if operation_id == OPERATION.MAX_CONNECTIONS.value:
         return FileResponse(
             path=f'./static/{variables.MAX_CONNECTIONS_RESULTS}'
         )
 
+    if operation_id == OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value:
+        # The test may still be running when the user requests its results
+        try:
+            with open(
+                f'./static/{variables.E2E_SINGLE_UE_THROUGHPUT_AND_LATENCY}',
+                "r"
+            ) as file:
+                data = json.load(file)
+
+                throughput_mbps, mean_rtt_ms = perf_operations\
+                    .process_iperf_results(data)
+
+                return JSONResponse(
+                    content={
+                        "throughput_mbps": throughput_mbps,
+                        "mean_rtt_ms": mean_rtt_ms
+                    },
+                    status_code=200
+                )
+        except:
+            return JSONResponse(
+                content="The E2E Single UE Throughput and Latency Performance "
+                "Test is not finished yet!",
+                status_code=404
+            )
+        
+    
     if operation_id == OPERATION.MAX_HOPS.value:
         # The test may still be running when the user requests its results
         if not os.path.exists(f'./static/{variables.MAX_HOPS_RESULTS}'):
@@ -266,20 +324,27 @@ async def get_report(operation_id: str):
 @app.post("/stop/{operation_id}")
 async def stop_test(operation_id: str):
     try:
-        if operation_id == OPERATION.E2E_UE_PERFORMANCE.value:
-            os.remove(f'./static/{variables.E2E_RESULTS}')
+        if operation_id == OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value:
+            while RUNNING_PROCESSES[
+                OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value
+            ]:
+                rp = RUNNING_PROCESSES[
+                    OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value
+                ].pop()
+                print(f"Will kill Iperf3 Server Process with PID {rp.pid}")
+                # Force the termination of the process
+                os.killpg(os.getpgid(rp.pid), signal.SIGTERM)
+                # Wait for the process to complete after termination/kill
+                rp.wait()
+                print(
+                    f"Iperf3 Server Process with PID {rp.pid} was terminated"
+                )
             return JSONResponse(
-                content="Sucessfully Cleaned Up test environment",
+                content="Sucessfully Stopped the E2E Single UE Throughput and "
+                "Latency Performance Test",
                 status_code=200
             )
         
-        if operation_id ==OPERATION.E2E_UE_PERFORMANCE.value:
-            os.remove(f'./static/{variables.E2E_RTT_RESULTS}')
-
-            return JSONResponse(
-                content="Sucessfully Cleaned Up test environment",
-                status_code=200
-            )
         
         if operation_id == OPERATION.MAX_HOPS.value:
             while RUNNING_PROCESSES[OPERATION.MAX_HOPS.value]:
@@ -299,6 +364,7 @@ async def stop_test(operation_id: str):
                 content="Sucessfully Stopped the Max Hops Performance Test",
                 status_code=200
             )
+        
  
         if operation_id == OPERATION.MAX_CONNECTIONS.value:
             
