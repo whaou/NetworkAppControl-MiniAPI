@@ -8,6 +8,8 @@ import json
 import os
 import multiprocessing
 
+def create_process_group():
+    os.setpgrp()
 
 def start_iperf_client(target_ip, number_of_streams):
     
@@ -20,7 +22,6 @@ def start_iperf_client(target_ip, number_of_streams):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         shell=True,
-        preexec_fn=create_process_group
     )
     print(f"Started Iperf3 client process with {number_of_streams} streams...")
     # Optional: Print the process ID (PID) if needed
@@ -37,6 +38,7 @@ def start_iperf_server():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         shell=True,
+        preexec_fn=create_process_group
     )
     print(f"Started Iperf3 server process...")
     # Optional: Print the process ID (PID) if needed
@@ -128,8 +130,7 @@ def start_max_hops_computing(target):
     return process
 
 
-def create_process_group():
-    os.setpgrp()
+
 
 
 def start_netstat_command():
