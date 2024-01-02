@@ -29,7 +29,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 RUNNING_PROCESSES = {
     OPERATION.MAX_CONNECTIONS.value: [],
     OPERATION.MAX_HOPS.value: [],
-    OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value: []
+    OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value: [],
+    OPERATION.E2E_MULTIPLE_UE_LATENCY_AND_THROUGHPUT.value: [],
 }
 
 # Dependency
@@ -82,6 +83,7 @@ async def start_test(
     is_server: bool = False,
     target_ip: str = None,
     target_port: int = None,
+    ue_count: int = None,
     target: str = None):
     try:
         if operation_id == OPERATION.LOGIN.value:
@@ -195,13 +197,66 @@ async def start_test(
                 
             return JSONResponse(
                 content=f"Started E2E Single UE Throughput and Latency "
-                "Performance Test",
+                "Performance Test.",
                 status_code=200
             )
             
             
+        if operation_id == OPERATION.E2E_MULTIPLE_UE_LATENCY_AND_THROUGHPUT.value:
+            # Delete old results file
+            if os.path.exists(
+                f'./static/{variables.E2E_SINGLE_UE_THROUGHPUT_AND_LATENCY}'
+            ):
+                os.remove(
+                    f'./static/{variables.E2E_SINGLE_UE_THROUGHPUT_AND_LATENCY}'
+                )
+            
+            error_message = None
+                            
+            # If the current MiniAPI is a client
+            if not is_server:
+                if not ue_count:
+                    error_message="You must indicate the number of UEs "\
+                        "(?ue_count=x). Since you did not, the E2E Mutiple UE"\
+                        "Throughput and Latency Test could not be started!"
 
-
+                else:
+                    # Now, we can run iperf3 in a indpendent process
+                    iperf_server_process = perf_operations.start_iperf_client(
+                        target_ip=target_ip,
+                        number_of_streams=ue_count
+                    )
+                    
+                    if not iperf_server_process:
+                        error_message = "Couldn't start Iperf3 Client. Thus, "\
+                        "the E2E Multiple UE Throughput and Latency Test "\
+                        "could not be started!"
+            else:
+                iperf_server_process = perf_operations.start_iperf_server()
+                
+                if not iperf_server_process:
+                    error_message = "Couldn't start Iperf3 Server. Thus, the"\
+                    "E2E Mutiple UE Throughput and Latency Test could not "\
+                    "be started!" 
+                else:
+                    # Save to process to kill it later, when /stop is invoked
+                    RUNNING_PROCESSES[
+                        OPERATION.E2E_MULTIPLE_UE_LATENCY_AND_THROUGHPUT.value
+                    ].append(iperf_server_process)
+            
+            if error_message:
+                return JSONResponse(
+                    content=error_message,
+                    status_code=400
+            )
+                
+            return JSONResponse(
+                content=f"Started E2E Multiple UE Throughput and Latency "
+                "Performance Test",
+                status_code=200
+            )
+        
+        
         if operation_id == OPERATION.MAX_HOPS.value:
             # Delete old results file
             if os.path.exists(f'./static/{variables.MAX_HOPS_RESULTS}'):
@@ -278,7 +333,10 @@ async def get_report(operation_id: str):
             path=f'./static/{variables.MAX_CONNECTIONS_RESULTS}'
         )
 
-    if operation_id == OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value:
+    if operation_id in [
+        OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value,
+        OPERATION.E2E_MULTIPLE_UE_LATENCY_AND_THROUGHPUT.value,
+    ]:
         # The test may still be running when the user requests its results
         try:
             with open(
@@ -324,6 +382,28 @@ async def get_report(operation_id: str):
 @app.post("/stop/{operation_id}")
 async def stop_test(operation_id: str):
     try:
+                
+        if operation_id == OPERATION.E2E_MULTIPLE_UE_LATENCY_AND_THROUGHPUT.value:
+            while RUNNING_PROCESSES[
+                OPERATION.E2E_MULTIPLE_UE_LATENCY_AND_THROUGHPUT.value
+            ]:
+                rp = RUNNING_PROCESSES[
+                    OPERATION.E2E_MULTIPLE_UE_LATENCY_AND_THROUGHPUT.value
+                ].pop()
+                print(f"Will kill Iperf3 Server Process with PID {rp.pid}")
+                # Force the termination of the process
+                os.killpg(os.getpgid(rp.pid), signal.SIGTERM)
+                # Wait for the process to complete after termination/kill
+                rp.wait()
+                print(
+                    f"Iperf3 Server Process with PID {rp.pid} was terminated"
+                )
+            return JSONResponse(
+                content="Sucessfully Stopped the E2E Multiple UE Throughput "
+                "and Latency Performance Test",
+                status_code=200
+            )
+        
         if operation_id == OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value:
             while RUNNING_PROCESSES[
                 OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value
