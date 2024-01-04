@@ -8,65 +8,73 @@ import json
 import os
 import multiprocessing
 
+def create_process_group():
+    os.setpgrp()
+
+def start_iperf_client(target_ip, number_of_streams):
+    
+    command = f"iperf3 -t 5 -c {target_ip} -P {number_of_streams} -J > "\
+    f"./static/{variables.E2E_SINGLE_UE_THROUGHPUT_AND_LATENCY}"
+
+    # Run the command as a background process
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True,
+    )
+    print(f"Started Iperf3 client process with {number_of_streams} streams...")
+    # Optional: Print the process ID (PID) if needed
+    print("Process ID:", process.pid)        
+    return process
 
 def start_iperf_server():
     # Command to start the iperf3 server
-    command = "iperf3 -s -1 &"
+    command = "iperf3 -s"
 
     # Run the command as a background process
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    # Optional: Print the process ID (PID) if needed
-    print("iperf3 server process ID:", process.pid)
-
-def start_iperf_client(server_ip):
     process = subprocess.Popen(
-        f'iperf3 -t 5 -c {server_ip} -J > ./static/{variables.E2E_RESULTS}',
+        command,
         stdout=subprocess.PIPE,
-        shell=True)
-
-def run_iperf_test(is_server: bool = False, server_ip = None):
-    if is_server:
-        print("Starting Server....")
-        start_iperf_server()
-    else:
-        print("Starting Client....")
-        start_iperf_client(server_ip)
-    return "OK"
-
-
-def start_ping(target_ip):
-    ping_parser = pingparsing.PingParsing()
-    transmiter = pingparsing.PingTransmitter()
-    wrapper = PingWrapperThread(
-        target=target_ip,
-        parser=ping_parser,
-        transmitter=transmiter
+        stderr=subprocess.PIPE,
+        shell=True,
+        preexec_fn=create_process_group
     )
-    wrapper.start()
-    wrapper.join()
+    print(f"Started Iperf3 server process...")
+    # Optional: Print the process ID (PID) if needed
+    print("Process ID:", process.pid)        
+    return process
+    
+def process_iperf_results(data):
 
-def start_hping(target_ip):
-    host, port = target_ip.split(":")
-    if host == None or port == None:
-        raise("Error!")
-    try:
-        # Run hping3 command
-        command = f"hping3 -S -c 5 {host} -p {port}"
-        output = subprocess.check_output(command,
-                    shell=True,
-                    stderr=subprocess.STDOUT,
-                    universal_newlines=True)
+    throughput_mbps = data['end']['sum_sent']['bits_per_second'] / 1000000
+    
+    mean_rtts_ms = []
+    for stream in  data['end']["streams"]:
+        mean_rtts_ms.append(stream["sender"]["mean_rtt"] * 0.001)
 
-        # Parse the output
-        parsed_output = parse_hping_output(output)
-        with open(f'./static/{variables.E2E_RTT_RESULTS}', 'w') as json_file:
-            json.dump(parsed_output, json_file)
-        return parsed_output
-    except subprocess.CalledProcessError as e:
-        print(f"Error running hping3: {e}")
-        return None
+    mean_rtt_ms = sum(mean_rtts_ms)/len(mean_rtts_ms)
 
+    return throughput_mbps, mean_rtt_ms
+
+
+# todo: needs to be updated
+def start_ping(target_ip, runs):
+    
+    for run in range(runs):
+        command = f"ping -c 5 {target_ip} | grep time= | "\
+            "awk '{print $7}' | cut -d'=' -f2 > "\
+            f"./static/{variables.E2E_SINGLE_UE_LATENCY_BASE_NAME}_{i}.json"
+        
+        # Run the command as a background process
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True,
+        )
+
+    print(f"Started {runs} ping client processes ...")
 
 def compute_max_hops(target):
     max_hops=30
@@ -122,8 +130,7 @@ def start_max_hops_computing(target):
     return process
 
 
-def create_process_group():
-    os.setpgrp()
+
 
 
 def start_netstat_command():
