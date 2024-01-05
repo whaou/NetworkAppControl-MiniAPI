@@ -267,3 +267,6 @@ $RECYCLE.BIN/
 *.db
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,venv,macos,windows
+
+# For buildpackage:
+.pybuild/
