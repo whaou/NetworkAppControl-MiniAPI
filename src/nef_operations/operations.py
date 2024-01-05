@@ -2,7 +2,7 @@
 # @Author: Rafael Direito
 # @Date:   2023-05-22 11:40:10
 # @Last Modified by:   Eduardo Santos
-# @Last Modified time: 2023-12-31 18:42:56
+# @Last Modified time: 2024-01-05 19:32:09
 import requests
 import json 
 
@@ -230,7 +230,7 @@ def get_ue_handover_event(ip, port, ue_supi, token):
     if response.status_code not in [200, 201, 409]:
         response.raise_for_status()
 
-def subscribe_qos_event (ip, port, callback_url, token):
+def subscribe_qos_event (ip, port, callback_url, token, monitoring_payload):
 
     url = f"http://{ip}:{port}/nef/api/v1/3gpp-as-session-with-qos/" \
         "v1/netapp/subscriptions"
@@ -239,41 +239,6 @@ def subscribe_qos_event (ip, port, callback_url, token):
     headers["accept"] = "application/json"
     headers["Authorization"] = "Bearer " + token
     headers["Content-Type"] = "application/json"
-    
-    monitoring_payload = {
-        "ipv4Addr": "10.0.0.0",
-        "ipv6Addr": "0:0:0:0:0:0:0:0",
-        "macAddr": "22-00-00-00-00-00",
-        "notificationDestination": callback_url,
-        "snssai": {
-            "sst": 1,
-            "sd": "000001"
-        },
-        "dnn": "province1.mnc01.mcc202.gprs",
-        "qosReference": 9,
-        "altQoSReferences": [
-            0
-        ],
-        "usageThreshold": {
-            "duration": 0,
-            "totalVolume": 0,
-            "downlinkVolume": 0,
-            "uplinkVolume": 0
-        },
-        "qosMonInfo": {
-            "reqQosMonParams": [
-            "DOWNLINK"
-            ],
-            "repFreqs": [
-            "EVENT_TRIGGERED"
-            ],
-            "latThreshDl": 0,
-            "latThreshUl": 0,
-            "latThreshRp": 0,
-            "waitTime": 0,
-            "repPeriod": 0
-        }
-    }
 
     response = requests.post(
         url=url,

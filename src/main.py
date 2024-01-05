@@ -2,7 +2,7 @@
 # @Author: Rafael Direito
 # @Date:   2023-05-22 10:53:45
 # @Last Modified by:   Eduardo Santos
-# @Last Modified time: 2023-12-31 18:42:45
+# @Last Modified time: 2024-01-05 19:31:32
 from fastapi import FastAPI, Path, Response, status, Depends
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
@@ -81,6 +81,7 @@ async def configure(payload: schemas.Configuration):
 @app.post("/start/{operation_id}")
 async def start_test(
     operation_id: str,
+    monitoring_payload: dict = None,
     is_server: bool = False,
     target_ip: str = None,
     target_port: int = None,
@@ -311,7 +312,8 @@ async def start_test(
                 ip=variables.VARIABLES["NEF_IP"],
                 port=variables.VARIABLES["NEF_PORT"],
                 callback_url=variables.VARIABLES["SUBS1_CALLBACK_URL"],
-                token = variables.VARIABLES["AUTH_TOKEN"]
+                token = variables.VARIABLES["AUTH_TOKEN"],
+                monitoring_payload = monitoring_payload
             )
             return JSONResponse(content="QoS Subscription Done", status_code=200)
 
