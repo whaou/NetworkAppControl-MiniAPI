@@ -1,0 +1,13 @@
+Source: miniapi
+Section: python
+Priority: extra
+Maintainer: None <None>
+Build-Depends: debhelper (>= 11~), dh-python, python3, python3-setuptools, python3-pydantic
+Standards-Version: 3.9.5
+
+Package: miniapi
+Architecture: any
+Pre-Depends: dpkg (>= 1.16.1), python3-minimal, ${misc:Pre-Depends}
+Depends: ${python3:Depends}, ${misc:Depends}, python3-pip
+Description: API to trigger the NEF tests of the 5GASP Project
+ API to trigger the NEF tests of the 5GASP Project

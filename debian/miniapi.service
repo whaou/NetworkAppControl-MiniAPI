@@ -1,0 +1,10 @@
+[Unit]
+Description=5GASP MiniAPI
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/miniapi -b 0.0.0.0 -p 3001
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,7 @@
+#! /usr/bin/env bash
+
+### This is the uggly way...
+# It would be more debian spirit compliant to create debian packages
+# to install those packages and to put these packages as dependecies of 
+# our own package. 
+python3 -m pip install sqlalchemy pingparsing pydantic_core==2.14.5
