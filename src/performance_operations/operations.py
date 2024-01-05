@@ -133,7 +133,9 @@ def start_max_hops_computing(target):
 
 
 
-def start_netstat_command():
+def start_netstat_command(output_file):
+    
+    print("HEllo")
     
     if os.system(f"netstat --version > /dev/null") == 0:
         base_command = "netstat -an | grep \"ESTABLISHED\""
@@ -149,7 +151,7 @@ def start_netstat_command():
         "+%s); elapsed_time=$((current_time - start_time)); if " \
         f"[ $elapsed_time -ge 300 ]; then break; fi; {base_command} " \
         "| wc -l >> " \
-        f"./static/{variables.MAX_CONNECTIONS_RESULTS}; sleep 1; done"
+        f"{output_file}; sleep 1; done"
 
     # Run the command as a background process
     process = subprocess.Popen(
