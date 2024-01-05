@@ -31,6 +31,7 @@ RUNNING_PROCESSES = {
     OPERATION.MAX_HOPS.value: [],
     OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value: [],
     OPERATION.E2E_MULTIPLE_UE_LATENCY_AND_THROUGHPUT.value: [],
+    OPERATION.NEF_CALLBACK_MAX_CONNECTIONS.value: [],
 }
 
 # Dependency
@@ -278,10 +279,12 @@ async def start_test(
 
         if operation_id == OPERATION.MAX_CONNECTIONS.value:
             # Delete old results file
-            if os.path.exists(f'./static/{variables.E2E_RESULTS}'):
-                os.remove(f'./static/{variables.E2E_RESULTS}')
+            if os.path.exists(f'./static/{variables.MAX_CONNECTIONS_RESULTS}'):
+                os.remove(f'./static/{variables.MAX_CONNECTIONS_RESULTS}')
             # Start the netstat loop
-            netstat_process = perf_operations.start_netstat_command()
+            netstat_process = perf_operations.start_netstat_command(
+                output_file=f'./static/{variables.MAX_CONNECTIONS_RESULTS}'
+            )
             
             # If we can start a monitoring process everything is ok
             if netstat_process:
@@ -312,6 +315,42 @@ async def start_test(
             )
             return JSONResponse(content="QoS Subscription Done", status_code=200)
 
+
+        if operation_id == OPERATION.NEF_CALLBACK_MAX_CONNECTIONS.value:
+            # Delete old results file
+            if os.path.exists(
+                f'./static/{variables.NEF_CALLBACK_MAX_CONNECTIONS_RESULTS}'
+            ):
+                os.remove(
+                    f'./static/{variables.NEF_CALLBACK_MAX_CONNECTIONS_RESULTS}'
+                )
+            
+            # Start the netstat loop
+            netstat_process = perf_operations.start_netstat_command(
+                output_file=f'./static/{variables.NEF_CALLBACK_MAX_CONNECTIONS_RESULTS}'
+            )
+            
+            # If we can start a monitoring process everything is ok
+            if netstat_process:
+                # Save to process to kill it later, when /stop is invoked
+                RUNNING_PROCESSES[
+                    OPERATION.NEF_CALLBACK_MAX_CONNECTIONS.value
+                ].append(
+                    netstat_process
+                )
+                print("Connections monitoring process was started...")
+                return JSONResponse(
+                    content="Connections monitoring process was started...",
+                    status_code=200
+                )
+            # If we couldn't start a monitoring process, inform the client
+            else:
+                print("Could not start the connections monitoring process")
+                return JSONResponse(
+                    content="Could not start the connections monitoring " +
+                    "process",
+                    status_code=400
+                )
     except Exception as e:
         return JSONResponse(content=f"Error: {e}", status_code=400)
 
@@ -332,6 +371,11 @@ async def get_report(operation_id: str):
         return FileResponse(
             path=f'./static/{variables.MAX_CONNECTIONS_RESULTS}'
         )
+    
+    if operation_id == OPERATION.NEF_CALLBACK_MAX_CONNECTIONS.value:
+        return FileResponse(
+            path=f'./static/{variables.NEF_CALLBACK_MAX_CONNECTIONS_RESULTS}'
+        )    
 
     if operation_id in [
         OPERATION.E2E_SINGLE_UE_LATENCY_AND_THROUGHPUT.value,
@@ -458,6 +502,27 @@ async def stop_test(operation_id: str):
                 print(f"Netstat Process with PID {rp.pid} was terminated")
 
             return JSONResponse(content="Sucessfully Cleaned Up test environment", status_code=200)
+
+        if operation_id == OPERATION.NEF_CALLBACK_MAX_CONNECTIONS.value:
+            while RUNNING_PROCESSES[
+                OPERATION.NEF_CALLBACK_MAX_CONNECTIONS.value
+            ]:
+                rp = RUNNING_PROCESSES[
+                    OPERATION.NEF_CALLBACK_MAX_CONNECTIONS.value
+                ].pop()
+                print(f"Will kill Netstat Process with PID {rp.pid}")
+                # Force kill the process (send SIGKILL)
+                os.killpg(os.getpgid(rp.pid), signal.SIGTERM)
+                # Wait for the process to complete after termination/kill
+                rp.wait()
+                print(f"Netstat Process with PID {rp.pid} was terminated")
+
+            return JSONResponse(
+                content="Sucessfully Cleaned Up test environment",
+                status_code=200
+            )
+
+
 
     except Exception as e:
         return JSONResponse(content=f"Error: {e}", status_code=400)
