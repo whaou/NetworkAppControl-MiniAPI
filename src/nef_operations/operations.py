@@ -103,8 +103,9 @@ def get_ues(ip, port, token):
         response.raise_for_status()
 
 
-def subscribe_event (ip, port, callback_url, monitoring_type,
-                     monitoring_expire_time, token):
+def subscribe_event(
+    ip, port, callback_url, monitoring_type, monitoring_expire_time, token
+):
 
     url = f"http://{ip}:{port}/nef/api/v1/3gpp-monitoring-event/" \
         "v1/netapp/subscriptions"
