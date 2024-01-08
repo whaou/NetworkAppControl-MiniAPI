@@ -1,5 +1,5 @@
-miniapi (0.0.1) unstable; urgency=low
+miniapi (0.0.2) unstable; urgency=low
 
-  * b'ded7578 Minor fix\n'
+  * Integration of upstream version c775644 (Sat Jan 6 12:05:14 2024)
 
- -- Christophe COUTURIER <couturier.christophe@gmail.com>  Sat, 30 Dec 2023 19:47:56 +0000
+ -- Christophe COUTURIER <couturier.christophe@gmail.com>  Fri, 5 Jan 2024 10:36:09 +0100
